@@ -13,7 +13,7 @@ import os
 
 ENDPOINT_URL = '{}.blob.core.windows.net'
 CONTAINER_URL = '{}.blob.core.windows.net/{}/'
-EXTENSIONS = ["txt", "csv", "pdf", "docx", "xlsx"]
+#EXTENSIONS = ["txt", "csv", "pdf", "docx", "xlsx"]
 STOP_SCAN_FLAG = "stop scan"
 
 def get_credentials():
@@ -89,8 +89,8 @@ def iterator_wrapper(iterator):
             yield (None,e)      
 
 
-def check_storage_account(account_name, key):
-    blob_service_client = BlobServiceClient(ENDPOINT_URL.format(account_name), credential=key)
+def check_storage_account(account_name, creds):
+    blob_service_client = BlobServiceClient(ENDPOINT_URL.format(account_name), creds)
     containers = blob_service_client.list_containers(timeout=15)
     public_containers = list() 
 
@@ -137,39 +137,16 @@ def check_subscription(tenant_id, tenant_name, sub_id, sub_name, creds):
             accounts_counter += 1
             group_to_names_dict[group][item.name] = ''
 
-    print("\t\t[+] Found {} storage accounts".format(accounts_counter), flush=True)
-
-    for group in resource_groups:
-        for account in group_to_names_dict[group].keys():
-            try:
-                storage_keys = storage_client.storage_accounts.list_keys(group, account)
-                storage_keys = {v.key_name: v.value for v in storage_keys.keys}
-                group_to_names_dict[group][account] = storage_keys['key1']
-            except azure.core.exceptions.HttpResponseError as e:
-                print("\t\t[-] User do not have permissions to retrieve storage accounts keys in the given"
-                      " subscription", flush=True)
-                print("\t\t    Can not scan storage accounts", flush=True)
-                return
-                
-
+    print("\t\t[+] Found {} storage accounts".format(accounts_counter), flush=True)                
     output_list = list()
 
     for group in resource_groups:
-        for account in group_to_names_dict[group].keys():
-            key = group_to_names_dict[group][account]
-            public_containers = check_storage_account(account, key)
-
+        for account in group_to_names_dict[group]:
+            public_containers = check_storage_account(account, creds)
             for cont in public_containers:
                 access_level = cont.public_access
-                container_client = ContainerClient(ENDPOINT_URL.format(account), cont.name, credential=key)
-                files = [f.name for f in container_client.list_blobs()]
-                ext_dict = count_files_extensions(files, EXTENSIONS)
                 row = [tenant_id, tenant_name, sub_id, sub_name, group, account, cont.name, access_level,
-                       CONTAINER_URL.format(account, cont.name), len(files)]
-
-                for ext in ext_dict.keys():
-                    row.append(ext_dict[ext])
-
+                       CONTAINER_URL.format(account, cont.name)]
                 output_list.append(row)
 
     print("\t\t[+] Scanned all storage accounts successfully", flush=True)
@@ -180,10 +157,7 @@ def check_subscription(tenant_id, tenant_name, sub_id, sub_name, creds):
         print("\t\t[+] No PUBLIC containers found")
 
     header = ["Tenant ID", "Tenant Name", "Subscription ID", "Subscription Name", "Resource Group", "Storage Account", "Container",
-              "Public Access Level", "URL", "Total Files"]
-
-    for ext in EXTENSIONS:
-        header.append(ext)
+              "Public Access Level", "URL"]
 
     header.append("others")
     write_csv('public-containers-{}.csv'.format(date.today()), header, output_list)
@@ -207,34 +181,6 @@ def write_csv(file_name, header, rows):
         for r in rows:
             writer.writerow(r)
 
-
-def count_files_extensions(files, extensions):
-    counter_dict = dict()
-    others_cnt = 0
-
-    for extension in extensions:
-        counter_dict[extension] = 0
-
-    for f_name in files:
-        in_extensions = False
-
-        for extension in extensions:
-            if f_name.endswith(extension):
-                in_extensions = True
-                counter_dict[extension] += 1
-                break
-
-        if not in_extensions:
-            if f_name.endswith("doc"):
-                counter_dict['docx'] += 1
-            elif f_name.endswith("xls"):
-                counter_dict['xlsx'] += 1
-            else:
-                others_cnt += 1
-
-    counter_dict['other'] = others_cnt
-    return counter_dict
-
 def choose_subscriptions(credentials):
     tenants_ids, tenants_names, subs_ids, subs_names = get_tenants_and_subscriptions(credentials)
     print("[+] Found {} subscriptions".format(len(subs_ids)), flush=True)
@@ -252,13 +198,13 @@ def print_logo():
     logo = '''
 -------------------------------------------------------------    
     
-    ______ _       _     _   _             _            
-    | ___ \ |     | |   | | | |           | |           
-    | |_/ / | ___ | |__ | |_| |_   _ _ __ | |_ ___ _ __ 
-    | ___ \ |/ _ \| '_ \|  _  | | | | '_ \| __/ _ \ '__|
-    | |_/ / | (_) | |_) | | | | |_| | | | | ||  __/ |   
-    \____/|_|\___/|_.__/\_| |_/\__,_|_| |_|\__\___|_|
-                                                                  
+    ______ _       _     _   _             _                 _  _  _
+    | ___ \ |     | |   | | | |           | |               | ||_|| |   
+    | |_/ / | ___ | |__ | |_| |_   _ _ __ | |_ ___ _ __     | | _ |_|_____
+    | ___ \ |/ _ \| '_ \|  _  | | | | '_ \| __/ _ \ '__|    | || || __/ __\ 
+    | |_/ / | (_) | |_) | | | | |_| | | | | ||  __/ |   |--|| || || ||  __/
+    \____/|_|\___/|_.__/\_| |_/\__,_|_| |_|\__\___|_|       |_||_||\__\__ |
+                                                                 
 -------------------------------------------------------------  
                     Author: Daniel Niv
 ------------------------------------------------------------- 
