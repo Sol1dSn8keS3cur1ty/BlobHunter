@@ -6,11 +6,7 @@ This is a modified version of https://github.com/cyberark/BlobHunter.
 
 ## Differences
 
-BlobHunter-Lite only requires an account with the "Reader" role assigned to identify misconfigured containers within Azure Blob Storage.
-
-The original BlobHunter requires an account with either the Storage Account Contributor, Contributor, or Owner role assigned. 
-
-Unlike BlobHunter, BlobHunter-Lite will not list the files within those containers like the original. 
+Unlike the original BlobHunter, BlobHunter-Lite only requires an account with the "Reader" role assigned to identify misconfigured containers within Azure Blob Storage. BlobHunter-Lite will not list the individual files found within misconfigured containers.
 
 I wrote a blog on how you can use an account with the "Reader" role to identify misconfigured Blob Storage containers, and then access the data within them anonymously. [An Intro to Azure Blob Storage and Abusing the Reader Role to Access Data](https://sol1dsn8kes3cur1ty.github.io/blog/An%20Intro%20to%20Azure%20Blob%20Storage%20and%20Abusing%20the%20Reader%20Role%20to%20Access%20Data.html
 )
